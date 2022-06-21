@@ -25,9 +25,14 @@ var _is_no_user_data_constructor_used := false
 var _is_default_destructor_used := false
 
 
-func build(library: NativeLibrary) -> void:
+class Result extends Resource:
+  var source_path: String
+
+
+func build(library: NativeLibrary, source_output: String) -> void:
   assert(library != null)
-  print("Building source for " + library.name)
+  assert(not source_output.empty())
+  print("Building source: " + library.title)
   if library.api == NativeLibrary.GDNative:
     build_gdnative(library)
   elif library.api == NativeLibrary.GDExtension:
@@ -36,10 +41,10 @@ func build(library: NativeLibrary) -> void:
     assert("Unknown API: " + String(library.api))
   var file := File.new()
   var dir := Directory.new()
-  if dir.make_dir_recursive(library.source_output.get_base_dir()) != OK:
-    push_error("Cannot create folder for outputting source: " + library.source_output)
-  if file.open(library.source_output, File.WRITE) != OK:
-    push_error("Cannot open file for outputting source: " + library.source_output)
+  if dir.make_dir_recursive(source_output.get_base_dir()) != OK:
+    push_error("Cannot create folder for outputting source: " + source_output)
+  if file.open(source_output, File.WRITE) != OK:
+    push_error("Cannot open file for outputting source: " + source_output)
   file.store_string(prelude)
   file.store_string(typedefs)
   file.store_string(function_declarations)
@@ -91,7 +96,7 @@ func form_class_init_gdnative(cls: NativeLibrary.Class) -> void:
   # todo: Proper commenting
   script_initialization += """
   /* %s class registration */
-  """ % cls.name
+  """ % cls.title
   # Handle construction
   if cls.user_data_fields.size() == 0 and cls.constructor == null:
     # Use generic no user data constructor
@@ -107,7 +112,7 @@ func form_class_init_gdnative(cls: NativeLibrary.Class) -> void:
     script_initialization += """
     godot_instance_create_func constructor = { NULL, NULL, NULL };
     constructor.create_func = &%s_user_data_constructor;
-    """ % cls.name
+    """ % cls.title
     constructor_definitions += """
     static GDCALLINGCONV void *{class_named}_user_data_constructor(godot_object *p_instance, void *p_method_data) {
       (void)instance;
@@ -116,7 +121,7 @@ func form_class_init_gdnative(cls: NativeLibrary.Class) -> void:
       memset(user_data, 0, sizeof(struct {class_named}_user_data));
       return user_data;
     }
-    """.format({"class_named": cls.name})
+    """.format({"class_named": cls.title})
   else: 
     # User defined constructor, generated later as those might be reused
     script_initialization += """
@@ -140,7 +145,7 @@ func form_class_init_gdnative(cls: NativeLibrary.Class) -> void:
 
   script_initialization += """
   nativescript_api->godot_nativescript_register_class(p_handle, "%s", "%s", constructor, destructor);
-  """ % [cls.name, cls.base_class]
+  """ % [cls.title, cls.base_class]
 
   if cls.methods.size() != 0:
     # Bind methods to registered cls
@@ -157,7 +162,7 @@ func form_class_init_gdnative(cls: NativeLibrary.Class) -> void:
         class_method.method = &%s;
         nativescript_api->godot_nativescript_register_method(p_handle, "%s", "%s", itcgen_basic_method_attribs, class_method);
       }
-      """ % [method.symbol, cls.name, method_name]
+      """ % [method.symbol, cls.title, method_name]
 
   script_initialization += "}"
 
@@ -174,12 +179,13 @@ func form_user_data(cls: NativeLibrary.Class) -> void:
   typedefs += """
   struct %s_user_data {
     %s};
-  """ % [cls.name, fields]
+  """ % [cls.title, fields]
 
 
 func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method) -> void:
   # todo: Methods with default values
   # todo: One problem is that some methods might use user data, and thus be cls specific
+  # todo: Check types of variants before unwrapping
   method_declarations += """
   static GDCALLINGCONV godot_variant %s(godot_object *p_instance, void *p_method_data, void *p_user_data, int p_num_args, godot_variant **p_args);
   """ % method.symbol
@@ -196,15 +202,33 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
   if cls.user_data_fields.size() != 0:
     method_defintions += """
     struct %s_user_data *user_data = (struct %s_user_data *)p_user_data;
-    """ % [cls.name, cls.name]
+    """ % [cls.title, cls.title]
   # Unwrap variant parameters to their contained types
-  for parameter_pair in method.parameters: 
+  var idx := 0
+  for parameter_pair in method.parameters:
     assert(parameter_pair is Array)
     assert(parameter_pair[0] is String)
     assert(parameter_pair[1] is NativeLibrary.Type)
-    method_defintions += """
-    %s %s = itc_%s_from_variant();
-    """ % [parameter_pair[1].interface, parameter_pair[0], parameter_pair[1].gdscript.to_lower()]
+    if parameter_pair[1].gdscript == "Variant":
+      method_defintions += """
+      godot_variant %s = &p_args[%s];
+      """ % [parameter_pair[0], idx]
+    else:
+      method_defintions += """
+      if ({variant_type} != api->godot_variant_get_type(p_args[{arg_idx}])) {
+        itc_print_error("Type {type} required as {arg_idx}th parameter");
+        itc_variant result;
+        itc_variant_from_null(&result);
+        return result;
+      }
+      {type} {symbol} = itc_{type_lower}_from_variant(p_args[{arg_idx}]);
+      """.format({
+        "symbol" : parameter_pair[0],
+        "type": parameter_pair[1].interface,
+        "type_lower": parameter_pair[1].interface.to_lower(),
+        "variant_type": parameter_pair[1].variant,
+        "arg_idx": idx})
+    idx += 1
   method_defintions += method.source
   method_defintions += "}"
 
@@ -219,7 +243,7 @@ func form_function(function: NativeLibrary.Function) -> void:
     parameter_list += parameter_pair[1].interface + " " + parameter_pair[0]
     if idx != function.parameters.size() - 1:
       parameter_list += ", "
-  var signature := (function.return_type.interface + " " + function.name + "(" + parameter_list + ")") as String
+  var signature := ("static " + function.return_type.interface + " " + function.title + "(" + parameter_list + ")") as String
   function_declarations += signature + ";\n"
   function_defintions += "\n" + signature + " {\n" + function.source + "\n}\n"
 
@@ -248,7 +272,8 @@ const GDNATIVE_ABSTRACTION = """
 /* Zeroed allocation */
 void *itc_calloc(size_t N) {
   void *result = itc_alloc(N);
-  memset(result, 0, N);
+  char *zero_ptr = (char *)result;
+  while (N-- > 0) *zero_ptr++ = 0;
   return result;
 }
 """
@@ -256,12 +281,12 @@ void *itc_calloc(size_t N) {
 
 const GDNATIVE_INTERFACE = """
 /** Prelude **/
-#include <stddef.h> // For NULL
-#include <string.h> // For memset
+#include <stddef.h>
 
 #include <gdnative_api_struct.gen.h>
 
-#define ITC_API_GDNATIVE /* Check for this definition if you need to conditionally compile with particular api in mind */
+/* Check for this definition if you need to conditionally compile with particular api in mind */
+#define ITC_API_GDNATIVE
 
 static const godot_gdnative_core_api_struct *api = NULL;
 static const godot_gdnative_ext_nativescript_api_struct *nativescript_api = NULL;

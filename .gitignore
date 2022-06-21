@@ -56,3 +56,6 @@ dkms.conf
 *.sublime-*
 .import/
 **/.temp/
+
+addons/*
+!addons/inter-c

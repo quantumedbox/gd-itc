@@ -1,8 +1,8 @@
 tool
 extends NativeLibrary
 
-func _init() -> void:
-  name = "libexample"
+func _ready() -> void:
+  title = "libexample"
   version = "0.1"
 
   # Class which will be represented by NativeScript instance
@@ -26,6 +26,7 @@ func _init() -> void:
     return calc_recur(nth - 1) + calc_recur(nth - 2);
     """)
 
-  build_source()
-  # Build source, shared object and appropriate gdns / gdnlib
-  # build() 
+  var source = build_source()
+  var compiler = get_default_compiler()
+  compiler.link_libc = false
+  compiler.build(source)
