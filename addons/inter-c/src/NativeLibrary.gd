@@ -27,16 +27,23 @@ func _init() -> void:
     # todo: Crash on error
 
 
+func build():
+  # Use default building strategy
+  var source = build_source()
+  var compiler = get_default_compiler()
+  compiler.build(source)
+
+
 # todo: Create .lock file with sha hashes of files on which library is dependent
 #       If hashes are equal to previous build's hash - there's no need to run this process again
 #       Problem is, we need to really be sure when something was changed or not, which means going for every include file in provided C sources, for example
 #       For that we would probably need to ask from user to make their includes transparent to inter-c interface
-func build_source(source_output: String = "") -> void:
+func build_source(source_output: String = ""):
   if source_output.empty():
     # todo: Set this option in object manner, as it's done with Compiler
     source_output = "res://addons/inter-c/.temp/%s.c" % title
   var builder = load("res://addons/inter-c/src/SourceBuilder.gd").new()
-  builder.build(self, source_output)
+  return builder.build(self, source_output)
 
 
 func get_default_compiler() -> BinaryBuilder:

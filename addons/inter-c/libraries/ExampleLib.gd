@@ -26,7 +26,4 @@ func _ready() -> void:
     return calc_recur(nth - 1) + calc_recur(nth - 2);
     """)
 
-  var source = build_source()
-  var compiler = get_default_compiler()
-  compiler.link_libc = false
-  compiler.build(source)
+  build()

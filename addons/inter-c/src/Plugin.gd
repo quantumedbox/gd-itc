@@ -14,7 +14,6 @@ func _exit_tree() -> void:
 
 
 func build() -> bool:
-  print("Running inter-c")
   var dir := Directory.new()
   if dir.open("res://addons/inter-c/libraries") != OK:
     push_error("Cannot open inter-c libraries folder")

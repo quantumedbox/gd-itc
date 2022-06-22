@@ -1,5 +1,6 @@
 tool
 extends Object
+class_name SourceBuilder
 
 # todo: Proper identation on nested bodies
 # todo: All that formatting might be quite expensive, we might consider profiling it
@@ -26,13 +27,17 @@ var _is_default_destructor_used := false
 
 
 class Result extends Resource:
+  # todo: Collect errors here, or at least success status
+  var title: String
   var source_path: String
 
 
-func build(library: NativeLibrary, source_output: String) -> void:
+func build(library: NativeLibrary, source_output: String) -> Result:
   assert(library != null)
   assert(not source_output.empty())
-  print("Building source: " + library.title)
+  var result := Result.new()
+  result.title = library.title
+  print("ITC: Building source: " + library.title)
   if library.api == NativeLibrary.GDNative:
     build_gdnative(library)
   elif library.api == NativeLibrary.GDExtension:
@@ -55,6 +60,8 @@ func build(library: NativeLibrary, source_output: String) -> void:
   file.store_string(function_defintions)
   file.store_string(method_defintions)
   file.close()
+  result.source_path = source_output
+  return result
 
 
 func build_gdnative(library: NativeLibrary) -> void:
@@ -192,7 +199,7 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
   method_defintions += """
   static GDCALLINGCONV godot_variant {method_symbol}(godot_object *p_instance, void *p_method_data, void *p_user_data, int num_args, godot_variant **p_args) {
   if (num_args != {parameter_count}) {
-    itc_error("Invalid parameter count, required {parameter_count}");
+    itc_print_error("Invalid parameter count, required {parameter_count}");
     itc_variant result;
     itc_variant_from_null(&result);
     return result;
@@ -221,11 +228,11 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
         itc_variant_from_null(&result);
         return result;
       }
-      {type} {symbol} = itc_{type_lower}_from_variant(p_args[{arg_idx}]);
+      {type} {symbol} = itc_{type_coversion}_from_variant(p_args[{arg_idx}]);
       """.format({
         "symbol" : parameter_pair[0],
         "type": parameter_pair[1].interface,
-        "type_lower": parameter_pair[1].interface.to_lower(),
+        "type_coversion": parameter_pair[1].gdscript.to_lower(), # todo: Might need something better than that assumption
         "variant_type": parameter_pair[1].variant,
         "arg_idx": idx})
     idx += 1
@@ -262,7 +269,7 @@ const GDNATIVE_TYPES = """
 const GDNATIVE_ABSTRACTION = """
 /** Abstraction layer for GDNative functionalities **/
 /* Print godot error with current function, line and file location and given description */
-#define itc_error(description) api->godot_print_error((description), __func__, __FILE__, __LINE__)
+#define itc_print_error(description) api->godot_print_error((description), __func__, __FILE__, __LINE__)
 
 /* Allocates N bytes using Godot provided allocator and returns type erased address to allocated region
     Note that it doesn't specify whether it zeroes the data, use `itc_calloc(N)` if you need zeroed memory
@@ -270,10 +277,26 @@ const GDNATIVE_ABSTRACTION = """
 #define itc_alloc(N) api->godot_alloc(N)
 
 /* Zeroed allocation */
-void *itc_calloc(size_t N) {
+static void *itc_calloc(size_t N) {
   void *result = itc_alloc(N);
   char *zero_ptr = (char *)result;
   while (N-- > 0) *zero_ptr++ = 0;
+  return result;
+}
+
+/* To variant conversions, assumes that source object is no longer needed
+  Parameter `var` is non-const pointer to `itc_variant`
+  Parameter `val` is specific to particular function. Generally, fundamental types are passed by value, while everything else by const pointer
+*/
+#define itc_variant_from_null(var) api->godot_variant_new_nil(var)
+#define itc_variant_from_int(var, val) api->godot_variant_new_int(var, val)
+
+/* From variant conversions, assumes that source variant is no longer needed
+  Parameter `var` is non-const pointer to `itc_variant`
+*/
+static itc_int itc_int_from_variant(itc_variant *self) {
+  itc_int result = api->godot_variant_as_int(self);
+  api->godot_variant_destroy(self);
   return result;
 }
 """
