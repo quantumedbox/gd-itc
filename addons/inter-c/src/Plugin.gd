@@ -28,6 +28,7 @@ func build() -> bool:
         push_error("Invalid library script {}, it should extend NativeLibrary" % file_name)
         dir.dir_list_end()
         return false
+      library.builder = BinaryBuilder.new().init_default("Host")
       root.add_child(library) # Triggers building on entering the scene
     file_name = dir.get_next()
   dir.list_dir_end()

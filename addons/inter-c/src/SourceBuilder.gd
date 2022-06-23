@@ -1,5 +1,5 @@
 tool
-extends Object
+extends Resource
 class_name SourceBuilder
 
 # todo: Proper identation on nested bodies
@@ -28,8 +28,10 @@ var _is_default_destructor_used := false
 
 class Result extends Resource:
   # todo: Collect errors here, or at least success status
+  # Library title
   var title: String
-  var source_path: String
+  # Path to C file
+  var path: String
 
 
 func build(library: NativeLibrary, source_output: String) -> Result:
@@ -60,7 +62,7 @@ func build(library: NativeLibrary, source_output: String) -> Result:
   file.store_string(function_defintions)
   file.store_string(method_defintions)
   file.close()
-  result.source_path = source_output
+  result.path = source_output
   return result
 
 

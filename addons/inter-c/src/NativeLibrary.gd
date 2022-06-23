@@ -15,6 +15,9 @@ var root_class: Class = null
 var classes: Dictionary # Dictionary<String, Class>
 var functions: Dictionary # Dictionary<String, Function>
 
+var builder: Node # BinaryBuilder
+var source: Resource # SourceBuilder.Result
+
 
 func _init() -> void:
   var version_info := Engine.get_version_info()
@@ -23,15 +26,15 @@ func _init() -> void:
   elif version_info.major == 4:
     api = GDExtension
   else:
-    push_error("Godot version {} isn't supported" % version_info.string)
     # todo: Crash on error
+    push_error("ITC: Unsupported Godot version: " + version_info.string)
 
 
 func build():
   # Use default building strategy
-  var source = build_source()
-  var compiler = get_default_compiler()
-  compiler.build(source)
+  assert(builder != null)
+  source = build_source()
+  builder.build(self)
 
 
 # todo: Create .lock file with sha hashes of files on which library is dependent
@@ -42,15 +45,8 @@ func build_source(source_output: String = ""):
   if source_output.empty():
     # todo: Set this option in object manner, as it's done with Compiler
     source_output = "res://addons/inter-c/.temp/%s.c" % title
-  var builder = load("res://addons/inter-c/src/SourceBuilder.gd").new()
-  return builder.build(self, source_output)
-
-
-func get_default_compiler() -> BinaryBuilder:
-  var result = BinaryBuilder.new()
-  add_child(result)
-  result.init_default()
-  return result
+  var source_builder = load("res://addons/inter-c/src/SourceBuilder.gd").new()
+  return source_builder.build(self, source_output)
 
 
 func add_class(title: String, base_class: String = "Node", user_data_fields=[]) -> Class:
@@ -60,7 +56,7 @@ func add_class(title: String, base_class: String = "Node", user_data_fields=[]) 
   result.user_data_fields = user_data_fields
   result._library = self
   if classes.has(title):
-    push_error("Redefinition of class {} in library {}" % [title, self.title])
+    push_error("ITC: Redefinition of class {} in library {}" % [title, self.title])
     return null
   classes[title] = result
   return result
@@ -71,7 +67,7 @@ func add_function(title: String, parameters: Array, return_type: Type, source: S
   ## When building source there will be forward definition created at the top containing `signature`
   ## Note that will have internal linkage
   if functions.has(title):
-    push_error("Redefinition of function {} in library {}" % [title, self.title])
+    push_error("ITC: Redefinition of function {} in library {}" % [title, self.title])
     return null
   var result := Function.new()
   result.title = title
@@ -97,7 +93,7 @@ class Class extends Resource:
 
   func add_method(title: String, parameters: Array, source: String) -> Method:
     if methods.has(title):
-      push_error("Redefinition of method {} in class {}:{}" % [title, _library.title, self.title])
+      push_error("ITC: Redefinition of method {} in class {}:{}" % [title, _library.title, self.title])
       return null
     var result := Method.new()
     result.title = title
@@ -171,7 +167,7 @@ func type(type_hint: String) -> Type:
   elif api == GDExtension:
     return _type_gdextension(type_hint)
   else:
-    assert(false, "Unknown API: " + String(api))
+    assert(false, "ITC: Unknown API: " + String(api))
     return null
 
 

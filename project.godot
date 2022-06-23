@@ -1,0 +1,57 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "Node",
+"class": "BinaryBuilder",
+"language": "GDScript",
+"path": "res://addons/inter-c/src/BinaryBuilder.gd"
+}, {
+"base": "Object",
+"class": "ItcUtils",
+"language": "GDScript",
+"path": "res://addons/inter-c/src/ItcUtils.gd"
+}, {
+"base": "Node",
+"class": "NativeLibrary",
+"language": "GDScript",
+"path": "res://addons/inter-c/src/NativeLibrary.gd"
+}, {
+"base": "Resource",
+"class": "SourceBuilder",
+"language": "GDScript",
+"path": "res://addons/inter-c/src/SourceBuilder.gd"
+} ]
+_global_script_class_icons={
+"BinaryBuilder": "",
+"ItcUtils": "",
+"NativeLibrary": "",
+"SourceBuilder": ""
+}
+
+[application]
+
+config/name="Eh"
+run/main_scene="res://Node.tscn"
+config/icon="res://icon.png"
+
+[editor_plugins]
+
+enabled=PoolStringArray( "res://addons/godot-plugin-refresher/plugin.cfg", "res://addons/inter-c/plugin.cfg" )
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+quality/driver/driver_name="GLES2"
+vram_compression/import_etc=true
+vram_compression/import_etc2=false
