@@ -15,7 +15,7 @@ var root_class: Class = null
 var classes: Dictionary # Dictionary<String, Class>
 var functions: Dictionary # Dictionary<String, Function>
 
-var builder: Node # BinaryBuilder
+var builder: Resource # BinaryBuilder
 var source: Resource # SourceBuilder.Result
 
 
@@ -31,8 +31,7 @@ func _init() -> void:
 
 
 func build():
-  # Use default building strategy
-  assert(builder != null)
+  assert(builder != null, "ITC: Builder not set")
   source = build_source()
   builder.build(self)
 

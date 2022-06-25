@@ -1,5 +1,5 @@
 tool
-extends Node
+extends Resource
 class_name BinaryBuilder
 
 ## Build interface for generating binary output from C source
@@ -8,11 +8,8 @@ class_name BinaryBuilder
 # todo: We need enumeratable compiler identity value for providing conditional compilation
 #       Currently `cli` and `cc` properties are present, but they dont convey what we want
 
-const TEMP_DIR := "res://addons/inter-c/.temp"
-const TCC_BINARY_FILE := TEMP_DIR + "/tcc.zip"
-const TCC_BINARY_LINK := "http://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27-win64-bin.zip"
-const TCC_DIR := TEMP_DIR + "/tcc"
-
+# Default binary, resolved on plugin entering the scene
+const TCC_BIN := "res://addons/inter-c/.temp/tcc/tcc"
 
 # todo: Provide more options, at least the most used ones
 # Compiler path
@@ -101,7 +98,7 @@ func _init_default_host() -> void:
   os = OS.get_name()
   if os == "Windows":
     cli = "tcc"
-    cc = _resolve_tcc() + ".exe"
+    cc = TCC_BIN
   else:
     cli = "gcc"
     cc = "gcc" # Use the one from PATH env
@@ -125,93 +122,36 @@ func prepare_lib(library) -> void:
   var gdns_path = "res://bin/" + library.title + ".gdns"
 
   var gdns_content = """
-[gd_resource type="NativeScript" load_steps=2 format=2]
-[ext_resource path="{gdnlib_path}" type="GDNativeLibrary" id=1]
-[resource]
-resource_name = "{title}"
-class_name = "{root_class}"
-library = ExtResource( 1 )""".format({
-    "gdnlib_path": gdnlib_path,
-    "title": library.title,
-    "root_class": library.root_class.title})
+    [gd_resource type="NativeScript" load_steps=2 format=2]
+    [ext_resource path="{gdnlib_path}" type="GDNativeLibrary" id=1]
+    [resource]
+    resource_name = "{title}"
+    class_name = "{root_class}"
+    library = ExtResource( 1 )""".format({
+        "gdnlib_path": gdnlib_path,
+        "title": library.title,
+        "root_class": library.root_class.title})
   if not ItcUtils.save_to_file(gdns_path, gdns_content):
     push_error("ITC: Cannot open for writing: " + gdns_path)
 
   var gdnlib_content = """
-[general]
-singleton=false
-load_once=true
-symbol_prefix="godot_"
-reloadable=false
-[entry]
-Windows.64="res://bin/windows-x64/{title}.dll"
-Windows.32="res://bin/windows-x86/{title}.dll"
-X11.64="res://bin/x11-x64/lib{title}.so"
-OSX.64="res://bin/osx-x64/lib{title}.dynlib"
-[dependencies]
-Windows.64=[]
-Windows.32=[]
-X11.64=[]
-OSX.64=[]""".format({"title": library.title})
+    [general]
+    singleton=false
+    load_once=true
+    symbol_prefix="godot_"
+    reloadable=false
+    [entry]
+    Windows.64="res://bin/windows-x86_64/{title}.dll"
+    Windows.32="res://bin/windows-x86/{title}.dll"
+    X11.64="res://bin/x11-x64/lib{title}.so"
+    OSX.64="res://bin/osx-x64/lib{title}.dynlib"
+    [dependencies]
+    Windows.64=[]
+    Windows.32=[]
+    X11.64=[]
+    OSX.64=[]""".format({"title": library.title})
   if not ItcUtils.save_to_file(gdnlib_path, gdnlib_content):
     push_error("ITC: Cannot open for writing: " + gdnlib_path)
-
-
-func _resolve_tcc() -> String:
-  ## Downloads TCC binary specifically for this project
-  # todo: We might want to reuse downloaded compiler, for example, by putting it in non-project specific temporary folder
-  # todo: Test whether TCC is already present in PATH
-  # todo: Check whether present TCC is working
-  # todo: Potential vulnerability as there's no checking done whether we're storing desired file, or somebody tempered with our packets along the way
-  # todo: We could compile more recent fork of TCC using this, or find a mirror that hosts those
-  var dir := Directory.new()
-  if dir.dir_exists(TCC_DIR):
-    # todo: That's a dubious way to test resolution
-    print_debug("ITC: Using cached tcc distribution")
-    return TCC_DIR + "/tcc"
-  print_debug("ITC: Downloading tcc distribution via internet")
-  if dir.make_dir_recursive(TEMP_DIR) != OK:
-    push_error("ITC: Cannot create folder for saving tcc distribution at " + TEMP_DIR)
-  var request_node = preload("res://addons/inter-c/src/RequestNode.gd").new()
-  add_child(request_node)
-  if request_node.request_file(TCC_BINARY_LINK, TCC_BINARY_FILE) != OK:
-    push_error("ITC: Error on making HTTP request")
-    return
-  yield(request_node, "finished")
-  # todo: One problem is that `yield` will return control to caller immediately, without awaiting
-  _unzip_contents(TCC_BINARY_FILE, TEMP_DIR)
-  print_debug("ITC: Done unzipping")
-  return TCC_DIR + "/tcc"
-
-
-static func _unzip_contents(file_path: String, dest_dir: String) -> void:
-  # Currently uses gdunzip.gd: https://github.com/jellehermsen/gdunzip
-  # It's rather slow, but provides a portable way of doing so
-  # Once Zip api exposure to GDScript is finally merged, we could get rid of it: https://github.com/godotengine/godot/pull/34444
-  print_debug("ITC: Unzipping tcc distribution")
-  var gdunzip = load("res://addons/inter-c/src/extern/gdunzip.gd").new()
-  var archive = gdunzip.load(file_path)
-  if not archive:
-    push_error("ITC: Cannot open %s for unzipping" % file_path)
-    return
-  var file := File.new()
-  var dir := Directory.new()
-  for file_meta in gdunzip.files.values():
-    if file_meta["uncompressed_size"] == 0:
-      # Directories could be distinguished this way
-      continue
-    var data = gdunzip.uncompress(file_meta["file_name"])
-    if not data:
-      push_error("ITC: Error on uncompressing: " + file_meta["file_name"])
-      continue
-    var path := (dest_dir + "/" + file_meta["file_name"]) as String
-    var dir_path := path.get_base_dir()
-    if dir.make_dir_recursive(dir_path) != OK:
-      push_error("ITC: Cannot create folder for unzipping tcc distribution: " + dir_path)
-    file.open(path, File.WRITE)
-    file.store_buffer(data)
-    file.close()
-    print_debug("ITC: Unzipped: " + file_meta["file_name"])
 
 
 func get_target_extension() -> String:
