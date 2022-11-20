@@ -58,7 +58,6 @@ dkms.conf
 **/.temp/
 
 addons/*
-!addons/inter-c
-
+!addons/itc
 
 bin/

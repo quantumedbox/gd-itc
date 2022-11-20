@@ -2,16 +2,18 @@ tool
 extends Node
 class_name NativeLibrary
 
-# todo: version_guard() function that will lock library to particular inter-c version range
+# todo: version_guard() function that will lock library to particular itc version range
 # todo: Better error handling
 
-enum { InterfaceUnknown, GDNative, GDExtension }
-var api := InterfaceUnknown
+enum { GDNone, GDNative, GDExtension }
+var api := GDNone
 var api_version # todo: Handle different versions of GDNative
 
 var title: String
+var author: String
+var license: String
 var version: String
-var root_class: Class = null
+
 var classes: Dictionary # Dictionary<String, Class>
 var functions: Dictionary # Dictionary<String, Function>
 
@@ -30,7 +32,9 @@ func _init() -> void:
     push_error("ITC: Unsupported Godot version: " + version_info.string)
 
 
-func build():
+func _ready():
+  assert(has_method("form_module"), "ITC: 'form_module' isn't defined")
+  call("form_module")
   assert(builder != null, "ITC: Builder not set")
   source = build_source()
   builder.build(self)
@@ -39,12 +43,12 @@ func build():
 # todo: Create .lock file with sha hashes of files on which library is dependent
 #       If hashes are equal to previous build's hash - there's no need to run this process again
 #       Problem is, we need to really be sure when something was changed or not, which means going for every include file in provided C sources, for example
-#       For that we would probably need to ask from user to make their includes transparent to inter-c interface
+#       For that we would probably need to ask from user to make their includes transparent to itc interface
 func build_source(source_output: String = ""):
   if source_output.empty():
     # todo: Set this option in object manner, as it's done with Compiler
-    source_output = "res://addons/inter-c/.temp/%s.c" % title
-  var source_builder = load("res://addons/inter-c/src/SourceBuilder.gd").new()
+    source_output = "res://addons/itc/.temp/%s.c" % title
+  var source_builder = load("res://addons/itc/src/SourceBuilder.gd").new()
   return source_builder.build(self, source_output)
 
 
@@ -90,13 +94,14 @@ class Class extends Resource:
   var destructor: Destructor = null
   var _library: NativeLibrary # todo: Make it WeakRef?
 
-  func add_method(title: String, parameters: Array, source: String) -> Method:
+  func add_method(title: String, parameters: Array, return_type: Type, source: String) -> Method:
     if methods.has(title):
       push_error("ITC: Redefinition of method {} in class {}:{}" % [title, _library.title, self.title])
       return null
     var result := Method.new()
     result.title = title
     result.parameters = parameters # todo: Check well-formity of parameters
+    result.return_type = return_type
     result.source = source
     methods[title] = result
     return result
@@ -105,6 +110,7 @@ class Class extends Resource:
 class Method extends Resource:
   var title: String
   var parameters: Array # Array<Array<String, Type>>
+  var return_type: Type
   var source: String
   var symbol: String
 
@@ -190,6 +196,6 @@ func _type_gdextension(type_hint: String) -> Type:
 func ctype(type_hint: String) -> Type:
   ## Propagates type to source as it is, `gdscirpt` field will not be formed
   var result := Type.new()
-  result.gdscript = "INVALID!@#!@#!" # todo: Not sure what to do here, lul
-  result.interface = "type_hint"
+  result.gdscript = ""
+  result.interface = type_hint
   return result

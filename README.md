@@ -1,4 +1,4 @@
-# gd-inter-c Native Library Building Plugin
+# gd-itc Native Library Building Plugin
 Interface agnostic way of writing Godot native libraries using GDScript
 with aim to create the easiest way for creating C libraries, both for developers and deployers of libraries
 

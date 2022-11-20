@@ -12,22 +12,22 @@ _global_script_classes=[ {
 "base": "Resource",
 "class": "BinaryBuilder",
 "language": "GDScript",
-"path": "res://addons/inter-c/src/BinaryBuilder.gd"
+"path": "res://addons/itc/src/BinaryBuilder.gd"
 }, {
 "base": "Object",
 "class": "ItcUtils",
 "language": "GDScript",
-"path": "res://addons/inter-c/src/ItcUtils.gd"
+"path": "res://addons/itc/src/ItcUtils.gd"
 }, {
 "base": "Node",
 "class": "NativeLibrary",
 "language": "GDScript",
-"path": "res://addons/inter-c/src/NativeLibrary.gd"
+"path": "res://addons/itc/src/NativeLibrary.gd"
 }, {
 "base": "Resource",
 "class": "SourceBuilder",
 "language": "GDScript",
-"path": "res://addons/inter-c/src/SourceBuilder.gd"
+"path": "res://addons/itc/src/SourceBuilder.gd"
 } ]
 _global_script_class_icons={
 "BinaryBuilder": "",
@@ -38,13 +38,13 @@ _global_script_class_icons={
 
 [application]
 
-config/name="Eh"
+config/name="Example"
 run/main_scene="res://Node.tscn"
 config/icon="res://icon.png"
 
 [editor_plugins]
 
-enabled=PoolStringArray( "res://addons/godot-plugin-refresher/plugin.cfg", "res://addons/inter-c/plugin.cfg" )
+enabled=PoolStringArray( "res://addons/itc/plugin.cfg" )
 
 [physics]
 
