@@ -5,6 +5,8 @@ class_name NativeLibrary
 # todo: version_guard() function that will lock library to particular itc version range
 # todo: Better error handling
 
+const TEMP_DIR := "res://addons/itc/.temp/"
+
 enum { GDNone, GDNative, GDExtension }
 var api := GDNone
 var api_version # todo: Handle different versions of GDNative
@@ -20,6 +22,24 @@ var functions: Dictionary # Dictionary<String, Function>
 var builder: Resource # BinaryBuilder
 var source: Resource # SourceBuilder.Result
 
+## Populated automatically to point to directory in which this library script is in
+var directory: String
+## Populated automatically to pointe to script file
+var script_path: String
+## Define it to put generated .c file on desired location
+var source_path: String setget ,_get_source_path
+
+
+func identity() -> void:
+  ## Used to fill information about library
+  ## Field 'title' is required to be defined
+  pass
+
+
+func library() -> void:
+  ## Used to construct library logic, any 'add_' function is valid here
+  pass
+
 
 func _init() -> void:
   var version_info := Engine.get_version_info()
@@ -33,23 +53,23 @@ func _init() -> void:
 
 
 func _ready():
-  assert(has_method("form_library"), "ITC: 'form_library' isn't defined")
-  call("form_library")
+  assert(has_method("library"), "ITC: 'library' isn't defined")
+  call("library")
   assert(builder != null, "ITC: Builder not set")
   source = build_source()
   builder.build(self)
 
 
-# todo: Create .lock file with sha hashes of files on which library is dependent
-#       If hashes are equal to previous build's hash - there's no need to run this process again
-#       Problem is, we need to really be sure when something was changed or not, which means going for every include file in provided C sources, for example
-#       For that we would probably need to ask from user to make their includes transparent to itc interface
-func build_source(source_output: String = ""):
-  if source_output.empty():
-    # todo: Set this option in object manner, as it's done with Compiler
-    source_output = "res://addons/itc/.temp/%s.c" % title
+func _get_source_path() -> String:
+  var result = source_path
+  if result.empty():
+    result = TEMP_DIR + title + ".c"
+  return result
+
+
+func build_source():
   var source_builder = load("res://addons/itc/src/SourceBuilder.gd").new()
-  return source_builder.build(self, source_output)
+  return source_builder.build(self, _get_source_path())
 
 
 func add_class(title: String, base_class: String = "Node", user_data_fields=[]) -> Class:

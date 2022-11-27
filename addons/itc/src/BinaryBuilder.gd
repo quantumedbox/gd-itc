@@ -34,11 +34,12 @@ var link_libc := true
 var include_paths := ["addons/itc/godot-headers", "addons/itc/godot-headers/gdnative"]
 
 
+# todo: Return success
 func build(library) -> void:
   if cc_identity == CompilerTCC:
     build_tcc(library)
   else:
-    push_error("Unknown C compiler identity")
+    push_error("ITC: Unknown C compiler identity")
   prepare_lib(library)
 
 
@@ -67,7 +68,8 @@ func build_tcc(library) -> void:
   var output = []
   if ItcUtils.invoke(ItcUtils.absolute_path(cc), args, output) != 0:
     push_error("ITC: Compiler invocation failed:")
-    print(output)
+    print(output) # todo: Route to log panel
+
 
 func get_target_identity() -> String:
   return os.to_lower() + "-" + arch

@@ -227,8 +227,6 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
       method_defintions += """
       if ({variant_type} != api->godot_variant_get_type(p_args[{arg_idx}])) {
         itc_print_error("Type {type} required as {arg_idx}th parameter");
-        itc_variant result;
-        itc_variant_from_null(&result);
         return result;
       }
       {type} {symbol} = itc_{type_coversion}_from_variant(p_args[{arg_idx}]);

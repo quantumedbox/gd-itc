@@ -1,11 +1,14 @@
 tool
 extends NativeLibrary
 
-func form_library() -> void:
+
+func identity() -> void:
   title = "libfibber"
   author = "Veclav Talica"
   version = "0.1"
 
+
+func library() -> void:
   # Class which will be represented by NativeScript instance
   var fibber = add_class("Fibber", "Object")
 
