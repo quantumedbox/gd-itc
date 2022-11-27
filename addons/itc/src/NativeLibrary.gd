@@ -85,7 +85,7 @@ func add_class(title: String, base_class: String = "Node", user_data_fields=[]) 
   return result
 
 
-func add_function(title: String, parameters: Array, return_type: Type, source: String) -> Function:
+func add_function(title: String, parameters: Dictionary, return_type: Type, source: String) -> Function:
   ## Add standalone function of which Godot is not aware
   ## When building source there will be forward definition created at the top containing `signature`
   ## Note that will have internal linkage
@@ -114,7 +114,7 @@ class Class extends Resource:
   var destructor: Destructor = null
   var _library: NativeLibrary # todo: Make it WeakRef?
 
-  func add_method(title: String, parameters: Array, return_type: Type, source: String) -> Method:
+  func add_method(title: String, parameters: Dictionary, return_type: Type, source: String) -> Method:
     if methods.has(title):
       push_error("ITC: Redefinition of method {} in class {}:{}" % [title, _library.title, self.title])
       return null
@@ -129,7 +129,7 @@ class Class extends Resource:
 
 class Method extends Resource:
   var title: String
-  var parameters: Array # Array<Array<String, Type>>
+  var parameters: Dictionary # Dictionary<String, Type>
   var return_type: Type
   var source: String
   var symbol: String
@@ -141,7 +141,7 @@ class Method extends Resource:
 
 class Function extends Resource:
   var title: String
-  var parameters: Array # Array<Array<String, String>>
+  var parameters: Dictionary # Dictionary<String, Type>
   var return_type: Type
   var source: String
 

@@ -215,14 +215,14 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
     """ % [cls.title, cls.title]
   # Unwrap variant parameters to their contained types
   var idx := 0
-  for parameter_pair in method.parameters:
-    assert(parameter_pair is Array)
-    assert(parameter_pair[0] is String)
-    assert(parameter_pair[1] is NativeLibrary.Type)
-    if parameter_pair[1].gdscript == "Variant":
+  for param in method.parameters:
+    var type = method.parameters[param]
+    assert(param is String)
+    assert(type is NativeLibrary.Type)
+    if type.gdscript == "Variant":
       method_defintions += """
       godot_variant %s = &p_args[%s];
-      """ % [parameter_pair[0], idx]
+      """ % [param, idx]
     else:
       method_defintions += """
       if ({variant_type} != api->godot_variant_get_type(p_args[{arg_idx}])) {
@@ -231,10 +231,10 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
       }
       {type} {symbol} = itc_{type_coversion}_from_variant(p_args[{arg_idx}]);
       """.format({
-        "symbol" : parameter_pair[0],
-        "type": parameter_pair[1].interface,
-        "type_coversion": parameter_pair[1].gdscript.to_lower(), # todo: Might need something better than that assumption
-        "variant_type": parameter_pair[1].variant,
+        "symbol" : param,
+        "type": type.interface,
+        "type_coversion": type.gdscript.to_lower(), # todo: Might need something better than that assumption
+        "variant_type": type.variant,
         "arg_idx": idx})
     idx += 1
   method_defintions += method.source
@@ -243,14 +243,15 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
 
 func form_function(function: NativeLibrary.Function) -> void:
   var parameter_list := ""
-  for idx in range(0, function.parameters.size()):
-    var parameter_pair := function.parameters[idx] as Array
-    assert(parameter_pair != null)
-    assert(parameter_pair[0] is String)
-    assert(parameter_pair[1] is NativeLibrary.Type)
-    parameter_list += parameter_pair[1].interface + " " + parameter_pair[0]
+  var idx := 0
+  for param in function.parameters:
+    var type = function.parameters[param]
+    assert(param is String)
+    assert(type is NativeLibrary.Type)
+    parameter_list += type.interface + " " + param
     if idx != function.parameters.size() - 1:
       parameter_list += ", "
+    idx += 1
   var signature := ("static " + function.return_type.interface + " " + function.title + "(" + parameter_list + ")") as String
   function_declarations += signature + ";\n"
   function_defintions += "\n" + signature + " {\n" + function.source + "\n}\n"
