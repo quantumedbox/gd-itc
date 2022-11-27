@@ -7,14 +7,6 @@ extends EditorPlugin
 const TEMP_DIR := "res://addons/itc/.temp"
 
 
-func _enter_tree() -> void:
-  pass
-
-
-func _exit_tree() -> void:
-  pass
-
-
 func find_library_scripts(cd: String) -> Array:
   if cd == "res://addons/itc/":
     return []
