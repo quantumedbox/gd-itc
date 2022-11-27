@@ -33,8 +33,8 @@ func _init() -> void:
 
 
 func _ready():
-  assert(has_method("form_module"), "ITC: 'form_module' isn't defined")
-  call("form_module")
+  assert(has_method("form_library"), "ITC: 'form_library' isn't defined")
+  call("form_library")
   assert(builder != null, "ITC: Builder not set")
   source = build_source()
   builder.build(self)

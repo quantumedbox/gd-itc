@@ -201,10 +201,10 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
   """ % method.symbol
   method_defintions += """
   static GDCALLINGCONV godot_variant {method_symbol}(godot_object *p_instance, void *p_method_data, void *p_user_data, int num_args, godot_variant **p_args) {
+  godot_variant result;
+  itc_variant_from_null(&result);
   if (num_args != {parameter_count}) {
     itc_print_error("Invalid parameter count, required {parameter_count}");
-    itc_variant result;
-    itc_variant_from_null(&result);
     return result;
   }
   """.format({"method_symbol": method.symbol, "parameter_count": method.parameters.size()})
@@ -240,7 +240,7 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
         "arg_idx": idx})
     idx += 1
   method_defintions += method.source
-  method_defintions += "}"
+  method_defintions += "return result;\n}"
 
 
 func form_function(function: NativeLibrary.Function) -> void:

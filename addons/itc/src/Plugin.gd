@@ -15,28 +15,36 @@ func _exit_tree() -> void:
   pass
 
 
-func build() -> bool:
+func find_library_scripts(cd: String) -> Array:
+  if cd == "res://addons/itc/":
+    return []
   var dir := Directory.new()
-  if dir.open("res://addons/itc/libraries") != OK:
-    push_error("ITC: Cannot open itc libraries folder")
-    return false
-  dir.list_dir_begin()
-  var dir_name = dir.get_next()
-  var root := get_tree().get_root() as Node
-  var file = File.new()
-  while not dir_name.empty():
-    var module = "res://addons/itc/libraries/" + dir_name + "/Module.gd"
-    if dir.current_is_dir() and file.file_exists(module):
-      var library = load(module).new() as NativeLibrary
-      if library == null:
-        push_error("ITC: Invalid library script %s, it should extend NativeLibrary" % dir_name)
-        dir.dir_list_end()
-        return false
-      var builder = BinaryBuilder.new().init_default("Host")
-      library.builder = builder
-      root.add_child(library) # Triggers building on entering the scene
-      root.remove_child(library)
-      library.queue_free()
-    dir_name = dir.get_next()
+  if dir.open(cd) != OK:
+    push_error("ITC: Cannot open directory: %s" % [cd])
+    return []
+  dir.list_dir_begin(true, true)
+  var result := []
+  var entry = dir.get_next()
+  while not entry.empty():
+    if dir.current_is_dir():
+      result += find_library_scripts(cd + entry + "/")
+    elif entry.ends_with(".gd"):
+      # todo: This check is really, really crude, there might be better way to do it
+      var script = ResourceLoader.load(cd + entry, "GDScript") as GDScript
+      if script != null and script.can_instance() and script.new() is NativeLibrary:
+        result.append(cd + entry)
+    entry = dir.get_next()
   dir.list_dir_end()
+  return result
+
+
+func build() -> bool:
+  var root := get_tree().get_root() as Node
+  for library_path in find_library_scripts("res://"):
+    print(library_path)
+    var library = load(library_path).new() as NativeLibrary
+    library.builder = BinaryBuilder.new().init_default("Host")
+    root.add_child(library) # Triggers building on entering the scene
+    root.remove_child(library)
+    library.queue_free()
   return true

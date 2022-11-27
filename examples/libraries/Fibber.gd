@@ -1,9 +1,9 @@
 tool
 extends NativeLibrary
 
-func form_module() -> void:
+func form_library() -> void:
   title = "libfibber"
-  author = "veclav talica"
+  author = "Veclav Talica"
   version = "0.1"
 
   # Class which will be represented by NativeScript instance
@@ -11,12 +11,9 @@ func form_module() -> void:
 
   # Methods are glue layer between C code and Godot
   # add_method() registers everything for you, and also checks and unwraps arguments
-  # They always return godot_variant objects, `ITC_X_TO_VARIANT` macros might be handy for that
-  # todo: Make 'result' variable and its returning implicit?
+  # Methods always return godot_variant objects, for that implicit 'result' variable is created and returned
   fibber.add_method("calculate", [["nth", type("int")]], type("int"), """
-    itc_variant result;
     itc_variant_from_int(&result, calc_recur(nth));
-    return result;
   """)
 
   # add_function() will generate forward declaration and definition at the same time,
