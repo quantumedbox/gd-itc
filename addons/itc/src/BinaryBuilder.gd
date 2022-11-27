@@ -17,8 +17,7 @@ var cc: String
 enum { CompilerUnknown, CompilerGCC, CompilerTCC }
 var cc_identity := CompilerUnknown
 
-# todo:
-var arch: String = "x86_64"
+var arch: String
 
 # OS identity
 # Uses the same string values as Godot, for example, in `OS.get_name`
@@ -58,24 +57,25 @@ func build_tcc(library) -> void:
     args += ["-nostdlib"]
   for path in include_paths:
     args += ["-I" + path]
-  var outpath = ItcUtils.absolute_path("res://") + "/bin/" + library.title + "/" + get_target_identity() + "/" + library.title + get_target_extension()
+  var outpath = ItcUtils.absolute_path("res://") + "bin/" + library.title + "/" + get_target_identity() + "/" + library.title + get_target_extension()
   args += ["-o", outpath]
   args += [ItcUtils.absolute_path(library.source.path)]
 
   if not ItcUtils.ensure_directory_for(outpath):
     push_error("ITC: Cannot create directory structure for: " + outpath)
 
-  if ItcUtils.invoke(ItcUtils.absolute_path(cc), args) != 0:
-    push_error("ITC: Compiler invocation failed")
-
+  var output = []
+  if ItcUtils.invoke(ItcUtils.absolute_path(cc), args, output) != 0:
+    push_error("ITC: Compiler invocation failed:")
+    print(output)
 
 func get_target_identity() -> String:
   return os.to_lower() + "-" + arch
 
 
 func init_default(strategy: String):
+  _init_default_shared()
   if strategy == "Host":
-    _init_default_shared()
     _init_default_host()
   else:
     assert(false, "Undefined strategy to default initialize builder: " + strategy)
@@ -91,6 +91,11 @@ func _init_default_host() -> void:
   else:
     cc_identity = CompilerGCC
     cc = "gcc" # Use the one from PATH env
+  # todo: Cover more available arch's
+  if OS.has_feature("x86_64"):
+    arch = "x86_64"
+  elif OS.has_feature("x86"):
+    arch = "x86"
 
 
 func _init_default_shared() -> void:
@@ -132,15 +137,11 @@ func prepare_lib(library) -> void:
     symbol_prefix="godot_"
     reloadable=false
     [entry]
-    Windows.64="res://bin/windows-x86_64/{title}.dll"
-    Windows.32="res://bin/windows-x86/{title}.dll"
-    X11.64="res://bin/x11-x64/lib{title}.so"
-    OSX.64="res://bin/osx-x64/lib{title}.dynlib"
-    [dependencies]
-    Windows.64=[]
-    Windows.32=[]
-    X11.64=[]
-    OSX.64=[]""".format({"title": library.title})
+    Windows.64="res://bin/{title}/windows-x86_64/{title}.dll"
+    Windows.32="res://bin/{title}/windows-x86/{title}.dll"
+    X11.64="res://bin/{title}/x11-x64/lib{title}.so"
+    OSX.64="res://bin/{title}/osx-x64/lib{title}.dynlib"
+  """.format({"title": library.title})
 
   if not ItcUtils.save_to_file(gdnlib_path, gdnlib_content):
     push_error("ITC: Cannot open for writing: " + gdnlib_path)

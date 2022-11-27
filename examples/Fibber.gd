@@ -1,6 +1,6 @@
 extends Node
 
-const FIBBER_SCRIPT := preload("res://bin/libexample.gdns")
+const FIBBER_SCRIPT := preload("res://bin/libfibber/Fibber.gdns")
 
 
 func _init() -> void:

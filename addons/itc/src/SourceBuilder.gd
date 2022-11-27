@@ -2,7 +2,7 @@ tool
 extends Resource
 class_name SourceBuilder
 
-# todo: Proper identation on nested bodies
+# todo: Proper indentation on nested bodies
 # todo: All that formatting might be quite expensive, we might consider profiling it
 # todo: Implement error stack / signaling, so that following steps could be aware of success of step they're dependent on
 # todo: Technically it's possible for different classes to share the same user data structure, and thus the same methods that operate on user data

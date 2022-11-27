@@ -22,13 +22,13 @@ static func save_to_file(filepath: String, content) -> bool:
   return true
 
 
-static func invoke(file: String, args: Array) -> int: # Status Code
+static func invoke(file: String, args: Array, output: Array = []) -> int: # Status Code
   # todo: Optionally capture output?
   print_debug("ITC: Invoking: ", file, ": ", args)
   if OS.get_name() == "Windows":
-    return OS.execute("CMD.EXE", ["/C" + file] + args)
+    return OS.execute("CMD.EXE", ["/C", file] + args, true, output)
   else:
-    return OS.execute(file, args)
+    return OS.execute(file, args, true, output)
 
 
 static func absolute_path(path: String) -> String:

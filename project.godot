@@ -39,7 +39,7 @@ _global_script_class_icons={
 [application]
 
 config/name="Example"
-run/main_scene="res://Node.tscn"
+run/main_scene="res://examples/Fibber.tscn"
 config/icon="res://icon.png"
 
 [editor_plugins]
