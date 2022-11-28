@@ -11,6 +11,12 @@ pool_array_types = [
     "pool_color_array"
 ]
 
+pool_array_reader_writers = []
+for t in pool_array_types:
+    pool_array_reader_writers += [t + "_reader", t + "_writer"]
+
+array_types = ["array"] + pool_array_types
+
 variant_types = [
     "bool",
     "uint",
@@ -34,8 +40,20 @@ variant_types = [
     "array"
 ] + pool_array_types
 
-def pool_array_element_type(t: str) -> str:
+destroyable_types = [
+    "variant",
+    "dictionary",
+    "string",
+    "string_name",
+    "char_string",
+    "object",
+    "node_path"] + array_types + pool_array_reader_writers
+
+
+def array_element_type(t: str) -> str:
     assert(t in pool_array_types)
+    if t == "array":
+        return "variant"
     return t[5:t.find('_array')]
 
 
@@ -44,18 +62,27 @@ def to_variant_type(t: str) -> str:
     return "GODOT_VARIANT_TYPE_" + t.upper()
 
 
+def to_godot_symbol(t: str) -> str:
+    if t.endswith("reader"):
+        return t[:-6] + "read_access"
+    if t.endswith("writer"):
+        return t[:-6] + "write_access"
+    return t
+
+
 def implement_type_interface(t: str, methods: []) -> str:
     result = ""
     for method in methods:
         parameters = "self"
         if len(method) > 1:
             for i, param in enumerate(method[1:]):
-                parameters += f", {param}_{i}"
+                parameters += f", {param}{i}"
         result += f"#define itc_{t}_{method[0]}({parameters}) api->godot_{t}_{method[0]}({parameters})\n\n"
     return result
 
 
-output = """
+output = """#pragma once
+
 #include <stddef.h>
 #include <stdint.h>
 // todo: Dont use any libc binaries here
@@ -82,15 +109,22 @@ extern const godot_gdnative_ext_nativescript_api_struct *nativescript_api;
   api->godot_print_error((description), __func__, __FILE__, __LINE__)
 
 /**
+ * Check for condition, automatically return 'null' variant on fail
  * @warning Should only be called inside automatically generated methods
  */
-#define itc_assert(condition) { \\
+#define itc_method_assert_with_message(condition, message) { \\
   if (!(condition)) { \\
-        itc_print_error("Assert failed: " #condition); \\
+        itc_print_error(message ": " #condition); \\
         itc_variant_new_nil(&result); \\
         return result; \\
     } \\
   }
+
+/**
+ * Check for condition, automatically return 'null' variant on fail
+ * @warning Should only be called inside automatically generated methods
+ */
+#define itc_method_assert(condition) itc_method_assert_with_message(condition, "Assertion failed")
 
 #define itc_allocate(bytes) api->godot_alloc(bytes)
 
@@ -146,13 +180,13 @@ output += implement_type_interface("variant", [
     ["as_pool_color_array"]
 ])
 
+# todo: Similar function but which does destroy object from which variant is initialized?
 # todo: Should it crash instead on type mismatch?
 # todo: Only check for type mismatch on debug?
 for t in variant_types:
     output += f"""static itc_{t} itc_variant_to_{t}(itc_variant *self) {{
-    if (itc_variant_get_type(self) != {to_variant_type(t)}) {{
+    if (itc_variant_get_type(self) != {to_variant_type(t)})
         itc_print_error("Invalid type of variant");
-    }}
     itc_{t} result = itc_variant_as_{t}(self);
     itc_variant_destroy(self);
     return result;
@@ -201,30 +235,61 @@ output += implement_type_interface("vector2", [
     ["get_y"]
 ])
 
-for t in pool_array_types:
-    element_type = pool_array_element_type(t)
-    output += implement_type_interface(t, [
-        ["new"],
-        ["new_copy", t],
-        ["new_with_array", "array"],
-        ["append", element_type],
-        ["append_array", t],
-        ["insert", "int", element_type],
-        ["invert"],
-        ["push_back", element_type],
-        ["remove", "int"],
-        ["resize", "int"],
-        ["sort"],
-        ["set", "int", element_type],
-        ["get", "int"],
-        ["size"],
-        ["empty"],
-        ["has", element_type],
-        ["destroy"]
-    ])
+array_methods = [
+    ["new"],
+    ["new_copy", "other"],
+    #["new_with_array", "array"],
+    ["append", "item"],
+    #["append_array", t],
+    ["insert", "int", "item"],
+    ["invert"],
+    ["push_back", "item"],
+    ["remove", "int"],
+    ["resize", "int"],
+    ["sort"],
+    ["set", "int", "item"],
+    ["get", "int"],
+    ["size"],
+    ["empty"],
+    ["has", "item"],
+    #["destroy"]
+]
 
-# godot_pool_byte_array_read_access GDAPI *godot_pool_byte_array_read(const godot_pool_byte_array *p_self);
-# godot_pool_byte_array_write_access GDAPI *godot_pool_byte_array_write(godot_pool_byte_array *p_self);
+for method in array_methods:
+    parameters = "self"
+    if len(method) > 1:
+        for i, param in enumerate(method[1:]):
+            parameters += f", {param}{i}"
+    output += f"#define itc_array_{method[0]}({parameters}) api->_Generic((self) \\\n"
+    for t in array_types:
+        output += f", itc_{t} *: godot_{t}_{method[0]} \\\n"
+    output += f")({parameters})\n\n"
+
+for t in pool_array_types:
+    output += f"typedef godot_{t}_read_access itc_{t}_reader;\n"
+    output += f"typedef godot_{t}_read_access itc_{t}_writer;\n\n"
+
+# todo: Function to reproduce this idiom
+
+output += "#define itc_array_new_reader(array) api->_Generic((array) \\\n"
+for t in pool_array_types:
+    output += f", itc_{t} *: godot_{t}_read \\\n"
+output += ")(array)\n\n"
+
+output += "#define itc_reader_get_ptr(reader) api->_Generic((reader) \\\n"
+for t in pool_array_types:
+    output += f", itc_{t}_reader *: godot_{t}_read_access_ptr \\\n"
+output += ")(reader)\n\n"
+
+output += "#define itc_array_new_writer(array) api->_Generic((array) \\\n"
+for t in pool_array_types:
+    output += f", itc_{t} *: godot_{t}_write \\\n"
+output += ")(array)\n\n"
+
+output += "#define itc_destroy(object) api->_Generic((object) \\\n"
+for t in destroyable_types:
+    output += f", itc_{t} *: godot_{to_godot_symbol(t)}_destroy \\\n"
+output += ")(object)\n\n"
 
 with open("gdnative.h", "w") as f:
     f.write(output)

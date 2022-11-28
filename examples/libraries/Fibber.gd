@@ -16,7 +16,7 @@ func library() -> void:
   # add_method() registers everything for you, and also checks and unwraps arguments
   # Methods always return godot_variant objects, for that implicit 'result' variable is created and returned
   fibber.add_method("calculate", {"nth": type("int")}, type("int"), """
-    itc_variant_from_int(&result, calc_recur(nth));
+    itc_variant_new(&result, calc_recur(nth));
   """)
 
   # add_function() will generate forward declaration and definition at the same time,

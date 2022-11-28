@@ -6,6 +6,7 @@ class_name SourceBuilder
 # todo: All that formatting might be quite expensive, we might consider profiling it
 # todo: Implement error stack / signaling, so that following steps could be aware of success of step they're dependent on
 # todo: Technically it's possible for different classes to share the same user data structure, and thus the same methods that operate on user data
+# todo: Only generate source code for objects that are used/referenced?
 
 ## Following listed variables will be put in source in order of their appearance:
 # API specific prelude
@@ -199,20 +200,38 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
   method_declarations += """
   static GDCALLINGCONV godot_variant %s(godot_object *p_instance, void *p_method_data, void *p_user_data, int p_num_args, godot_variant **p_args);
   """ % method.symbol
+
+  var result_init = ""
+  if method.return_type.is_array_type():
+    result_init = """
+    itc_%s result_init;
+    itc_array_new(&result_init);
+    itc_variant_new(&result, &result_init);
+    itc_destroy(&result_init);
+    """ % method.return_type.interface
+  elif method.return_type.gdscript == "Variant":
+    result_init = "itc_variant_new_nil(&return);"
+  else:
+    assert(false, "Unimplemented")
+
   method_defintions += """
   static GDCALLINGCONV godot_variant {method_symbol}(godot_object *p_instance, void *p_method_data, void *p_user_data, int num_args, godot_variant **p_args) {
-  godot_variant result;
-  itc_variant_from_null(&result);
+  itc_variant result;
+  {
+    {result_init}
+  }
   if (num_args != {parameter_count}) {
     itc_print_error("Invalid parameter count, required {parameter_count}");
     return result;
   }
   """.format({"method_symbol": method.symbol, "parameter_count": method.parameters.size()})
+
   # If user data is present - cast it to pointer of appropriate type
   if cls.user_data_fields.size() != 0:
     method_defintions += """
     struct %s_user_data *user_data = (struct %s_user_data *)p_user_data;
     """ % [cls.title, cls.title]
+
   # Unwrap variant parameters to their contained types
   var idx := 0
   for param in method.parameters:
@@ -225,18 +244,19 @@ func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method
       """ % [param, idx]
     else:
       method_defintions += """
-      if ({variant_type} != api->godot_variant_get_type(p_args[{arg_idx}])) {
-        itc_print_error("Type {type} required as {arg_idx}th parameter");
-        return result;
-      }
-      {type} {symbol} = itc_{type_coversion}_from_variant(p_args[{arg_idx}]);
+      itc_method_assert_with_message(
+        {variant_type} != itc_variant_get_type(p_args[{arg_idx}]),
+        "Type {type} required as {arg_idx}th parameter"
+      );
+      {type} {symbol} = itc_variant_to_{type_coversion}(p_args[{arg_idx}]);
       """.format({
         "symbol" : param,
         "type": type.interface,
-        "type_coversion": type.gdscript.to_lower(), # todo: Might need something better than that assumption
+        "type_coversion": type.interface,
         "variant_type": type.variant,
         "arg_idx": idx})
     idx += 1
+
   method_defintions += method.source
   method_defintions += "return result;\n}"
 
@@ -264,6 +284,7 @@ func build_gdextension(library: NativeLibrary) -> void:
 const GDNATIVE_INTERFACE = """
 /** Prelude **/
 #include <stddef.h>
+#include <assert.h>
 
 #include <gdnative_api_struct.gen.h>
 
@@ -273,7 +294,7 @@ const GDNATIVE_INTERFACE = """
 const godot_gdnative_core_api_struct *api = NULL;
 const godot_gdnative_ext_nativescript_api_struct *nativescript_api = NULL;
 
-// todo: We might provide way to include library code in here
+// todo: Better extension loading handling
 void GDN_EXPORT godot_gdnative_init(godot_gdnative_init_options *p_options) {
   api = p_options->api_struct;
   for (unsigned int i = 0; i < api->num_extensions; i++) {
@@ -281,6 +302,7 @@ void GDN_EXPORT godot_gdnative_init(godot_gdnative_init_options *p_options) {
       nativescript_api = (godot_gdnative_ext_nativescript_api_struct *)api->extensions[i];
     }
   }
+  assert(nativescript_api);
 }
 
 // todo: We might provide way to include library code in here
