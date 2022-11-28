@@ -191,11 +191,11 @@ func form_user_data(cls: NativeLibrary.Class) -> void:
     %s};
   """ % [cls.title, fields]
 
-
 func form_method_gdnative(cls: NativeLibrary.Class, method: NativeLibrary.Method) -> void:
   # todo: Methods with default values
   # todo: One problem is that some methods might use user data, and thus be cls specific
   # todo: Check types of variants before unwrapping
+  # todo: Check 'result' variant type before returning
   method_declarations += """
   static GDCALLINGCONV godot_variant %s(godot_object *p_instance, void *p_method_data, void *p_user_data, int p_num_args, godot_variant **p_args);
   """ % method.symbol
@@ -261,49 +261,6 @@ func build_gdextension(library: NativeLibrary) -> void:
   assert(false, "Unimplemented")
 
 
-const GDNATIVE_TYPES = """
-/** Interface agnostic typedefs fror basic types **/
-#define itc_variant godot_variant
-#define itc_int godot_int
-"""
-
-
-const GDNATIVE_ABSTRACTION = """
-/** Abstraction layer for GDNative functionalities **/
-/* Print godot error with current function, line and file location and given description */
-#define itc_print_error(description) api->godot_print_error((description), __func__, __FILE__, __LINE__)
-
-/* Allocates N bytes using Godot provided allocator and returns type erased address to allocated region
-    Note that it doesn't specify whether it zeroes the data, use `itc_calloc(N)` if you need zeroed memory
-*/
-#define itc_alloc(N) api->godot_alloc(N)
-
-/* Zeroed allocation */
-static void *itc_calloc(size_t N) {
-  void *result = itc_alloc(N);
-  char *zero_ptr = (char *)result;
-  while (N-- > 0) *zero_ptr++ = 0;
-  return result;
-}
-
-/* To variant conversions, assumes that source object is no longer needed
-  Parameter `var` is non-const pointer to `itc_variant`
-  Parameter `val` is specific to particular function. Generally, fundamental types are passed by value, while everything else by const pointer
-*/
-#define itc_variant_from_null(var) api->godot_variant_new_nil(var)
-#define itc_variant_from_int(var, val) api->godot_variant_new_int(var, val)
-
-/* From variant conversions, assumes that source variant is no longer needed
-  Parameter `var` is non-const pointer to `itc_variant`
-*/
-static itc_int itc_int_from_variant(itc_variant *self) {
-  itc_int result = api->godot_variant_as_int(self);
-  api->godot_variant_destroy(self);
-  return result;
-}
-"""
-
-
 const GDNATIVE_INTERFACE = """
 /** Prelude **/
 #include <stddef.h>
@@ -313,8 +270,8 @@ const GDNATIVE_INTERFACE = """
 /* Check for this definition if you need to conditionally compile with particular api in mind */
 #define ITC_API_GDNATIVE
 
-static const godot_gdnative_core_api_struct *api = NULL;
-static const godot_gdnative_ext_nativescript_api_struct *nativescript_api = NULL;
+const godot_gdnative_core_api_struct *api = NULL;
+const godot_gdnative_ext_nativescript_api_struct *nativescript_api = NULL;
 
 // todo: We might provide way to include library code in here
 void GDN_EXPORT godot_gdnative_init(godot_gdnative_init_options *p_options) {

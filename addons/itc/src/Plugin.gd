@@ -2,7 +2,6 @@ tool
 extends EditorPlugin
 
 # todo: Build libraries on export
-# todo: Standardize logging style to `ITC: <action>: <objects>`
 
 const TEMP_DIR := "res://addons/itc/.temp/"
 
@@ -56,6 +55,7 @@ func needs_building(lock: Dictionary, library: NativeLibrary) -> bool:
   return false
 
 
+# todo: Store builder args, so that rebuilding with different ones would be done
 func update_lock(lock: Dictionary, library: NativeLibrary) -> void:
   var mod_time = ItcUtils.get_file_modification_time(library.script_path)
   if mod_time == -1:

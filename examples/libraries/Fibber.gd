@@ -3,7 +3,7 @@ extends NativeLibrary
 
 
 func identity() -> void:
-  title = "libfibber"
+  title = "fibber"
   author = "Veclav Talica"
   version = "0.1"
 

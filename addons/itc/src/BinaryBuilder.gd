@@ -4,34 +4,40 @@ class_name BinaryBuilder
 
 ## Build interface for generating binary output from C source
 
+# todo: GDNative docs say that only major versions are binary compatible, that means we might want to check,
+#       whether library is built for given version or not when distributing prebuilts
+
 # todo: We need enumeratable compiler identity value for providing conditional compilation
 #       Currently `cc_identity` and `cc` properties are present, but they dont convey what we want
 
 # todo: Provide more options, at least the most used ones
-# Compiler path
-# Represents path to file that will be used for compilation
+
+## Compiler path
+## Represents path to file that will be used for compilation
 var cc: String
 
-# Compiler identity
-# Used primarily to distinguish between different ways of passing flags to compiler
+## Compiler identity
+## Used primarily to distinguish between different ways of passing flags to compiler
 enum { CompilerUnknown, CompilerGCC, CompilerTCC }
 var cc_identity := CompilerUnknown
 
 var arch: String
 
-# OS identity
-# Uses the same string values as Godot, for example, in `OS.get_name`
+## OS identity
+## Uses the same string values as Godot, for example, in `OS.get_name`
 var os: String
 
-# Compilation mode, available options are: `Debug`, `ReleaseFast` and `ReleaseSmall`
-# If not specified then mode is inferred from the way project is exported or played:
-# In editor it's always `Debug`
-# On Godot's debug export it's `Debug`, on release it's `ReleaseFast`
+## Compilation mode, available options are: `Debug`, `ReleaseFast` and `ReleaseSmall`
+## If not specified then mode is inferred from the way project is exported or played:
+## In editor it's always `Debug`
+## On Godot's debug export it's `Debug`, on release it's `ReleaseFast`, on web target release it's 'ReleaseSmall'
 var mode: String
 
-# If true, no libc will be linked and no builtin optimizations used
+## If false, no libc will be linked and no builtin optimizations used
 var link_libc := true
-var include_paths := ["addons/itc/godot-headers", "addons/itc/godot-headers/gdnative"]
+
+## Directories in which include directive will search
+var include_paths := ["addons/itc/godot-headers", "addons/itc/godot-headers/gdnative", "addons/itc/abstractions"]
 
 
 # todo: Return success
